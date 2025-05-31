@@ -1,0 +1,81 @@
+from IPython import get_ipython
+from datetime import datetime
+def run_qac_batch(taus, seeds):
+    ipython = get_ipython()
+    for tau in taus:
+        for seed in seeds:
+            file_name = 'RUN_2025-05-22_gauss_weighted_quantile_stepwise_standard_tanh_{}_{}'.format(
+
+                str(seed), str(tau).replace('.', '')
+            )
+
+            cli_args = (
+                f'--learning_tau {tau} --gamma 0.99 '
+                f'--save_as_file {file_name} '
+                f'--episodes 50 '
+                f'--add_tic_date False '
+                f'--min_epochs 15 '
+                f'--patience 2 '
+                f'--mc True '
+                f'--critic_type standard '
+                f'--rho 0.01 '
+                f'--mode train '
+                f'--transaction_cost 0.001 '
+                f'--seed {seed} '
+                f'--actor_loss weighted_quantile '
+                f'--entropy_reg 0.0001 '
+                f'--critic_lr_start 0.01 '
+                f'--critic_lr_end 0.001 '
+                f'--actor_lr_start 0.005 '
+                f'--actor_lr_end 0.001 '
+            )
+
+            print(f"\nRunning: Agent.py {cli_args}")
+            ipython.run_line_magic('run', f'Agent.py {cli_args}')
+
+taus = [0.1,0.5,0.9]
+#seeds = [53,274,1234,89]
+seeds = [53,274,1234,89]
+
+
+COST ANALYIS
+
+def run_qac_batch(taus, seeds, transaction_costs):
+    ipython = get_ipython()
+    for cost in transaction_costs:
+        for tau in taus:
+            for seed in seeds:
+                file_name = '20250523_stepwisestandardtanh_cost{}_{}_{}'.format(
+                    str(cost).replace('.', ''),
+                    str(seed),
+                    str(tau).replace('.', '')
+                )
+
+                cli_args = (
+                    f'--learning_tau {tau} --gamma 0.99 '
+                    f'--save_as_file {file_name} '
+                    f'--episodes 50 '
+                    f'--add_tic_date False '
+                    f'--min_epochs 15 '
+                    f'--patience 2 '
+                    f'--mc True '
+                    f'--critic_type standard '
+                    f'--rho 0.01 '
+                    f'--mode train '
+                    f'--transaction_cost {cost} '
+                    f'--seed {seed} '
+                    f'--actor_loss weighted_quantile '
+                    f'--entropy_reg 0.0001 '
+                    f'--critic_lr_start 0.01 '
+                    f'--critic_lr_end 0.001 '
+                    f'--actor_lr_start 0.005 '
+                    f'--actor_lr_end 0.001 '
+                )
+
+                print(f"\nRunning: Agent.py {cli_args}")
+                ipython.run_line_magic('run', f'Agent.py {cli_args}')
+
+taus = [0.1,0.5,0.9]
+#seeds = [53,274,1234,89]
+seeds = [53]
+transaction_cost = [0.0001,0.0005,0.001,0.002,0.005]
