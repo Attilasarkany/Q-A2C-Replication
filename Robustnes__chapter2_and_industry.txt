@@ -1,0 +1,468 @@
+papers to cite:
+https://arxiv.org/abs/1412.6980
+https://arxiv.org/abs/1711.05101
+
+1) hyperparameters:
+rho, learning rates and learning decay
+2) 
+Chapter 2:
+This is model based so we should have optimal solution:
+rho, learning rates and decay rate ( change this normally, see below)
+- Higher wgrid
+- change the variance
+
+The agent is not forced to trade everytime--> no trading regions.
+Do a small cost grid (ceteris paribus) and show the no trading region somehow, lets have a 10 cost region
+
+Local optimum
+
+
+Learning decay is not the best. Its input should be learning steps not episode..
+# Example: steps_per_episode = number of optimizer updates per episode
+steps_per_episode = args.steps_per_episode  # define this from your loop/dataset
+total_updates = args.episodes * steps_per_episode
+
+critic_decay = tf.keras.optimizers.schedules.PolynomialDecay(
+    initial_learning_rate=args.critic_lr_start,
+    decay_steps=total_updates,
+    end_learning_rate=args.critic_lr_end,
+    power=1.0,          # start with 1.0; 1.5 can be aggressive
+)
+
+self.critic_optimizer = tf.keras.optimizers.Adam(learning_rate=critic_decay, epsilon=1e-6)
+
+
+####
+original running files for model based set up
+
+    Phi_k = np.tile(np.array([[0.15, 0.10],
+                          [0.10, 0.15]], dtype=float), (3, 1, 1))
+    '''
+    original
+    const_k = np.array([
+        [ 0.0040,  0.0030],   # Bull
+        [ 0.0030,  0.0028],   # Neutral
+        [-0.0090,  0.0030],   # Bear
+    ], dtype=float)
+    '''
+
+##mexperiment 1, first we just changed the sigma_k, after that both const and sigmak
+    const_k = np.array([
+        [ 0.0060,  0.0050],  # Bull: lift both assets
+        [ 0.0045,  0.0045],  # Neutral: make both clearly positive
+        [-0.0010,  0.0045],  # Bear: keep asset 2 solidly positive
+    ], dtype=float)
+    '''
+    #original
+    Sigma_k = np.array([
+        [[0.0005,  0.00010],
+        [0.00010, 0.00045]],   # Bull
+        [[0.0018,  0.00000],
+        [0.00000, 0.00140]],   # Neutral
+        [[0.0050, -0.00300],
+        [-0.00300, 0.00200]],  # Bear
+    ], dtype=float)
+    '''
+    Sigma_k = np.array([
+    # Bull: modest variance, mild negative corr
+    [[0.00050, -0.00015],
+     [-0.00015, 0.00045]],
+
+    # Neutral: cut variance vs. original, stronger diversification
+    [[0.00100, -0.00025],
+     [-0.00025, 0.00080]],
+
+    # Bear: reduce variance materially; sizeable negative corr but PSD-safe
+    [[0.00250, -0.00090],
+     [-0.00090, 0.00120]],
+], dtype=float)
+    Q = np.array([
+        [0.97, 0.01, 0.02],
+        [0.15, 0.80, 0.05],
+        [0.10, 0.10, 0.80],
+    ], dtype=float)
+
+    Q_bull_bear = np.array([
+    [0.74, 0.02, 0.24],
+    [0.10, 0.82, 0.08],
+    [0.30, 0.02, 0.68]],dtype=float)  
+
+    Q_neutral_bear = np.array([
+    [0.82, 0.08, 0.10],
+    [0.02, 0.68, 0.30],
+    [0.02, 0.24, 0.74]],dtype=float)   
+
+    Q_bull_neutral = np.array([
+    [0.74, 0.24, 0.02],
+    [0.30, 0.68, 0.02],
+    [0.10, 0.08, 0.82]],dtype=float)    
+
+    K, N = const_k.shape
+
+    # previous risky weight grid
+    Wgrid = np.array([
+        [0.00, 0.00],
+        [1.00, 0.00],
+        [0.00, 1.00],
+        [0.50, 0.50],
+        [0.20, 0.20],
+        [0.35, 0.35],
+        [0.75, 0.25],
+        [0.25, 0.75],
+        [0.60, 0.20],
+        [0.20, 0.60],
+        [0.00, 0.10],
+        [0.10, 0.00],
+        [0.30, 0.00],
+        [0.00, 0.30],
+        [0.60, 0.00],
+        [0.00, 0.60],
+    ], dtype=float)
+
+
+
+
+############# COST ANALYSIS #############
+# %%
+
+
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+# %%
+
+# %%
+# %%
+##
+we did a little mistke, being imprecise. in the beginning runs, you did not keep these....after they were the same, 
+just in the beginning no...
+'''
+wrong
+def run_qac_batch(taus, seeds):
+    ipython = get_ipython()
+    for tau in taus:
+        for seed in seeds:
+            file_name = 'Dirichlet_final_neutral_bear_{}_{}'.format(
+
+                str(seed), str(tau).replace('.', '')
+            )
+
+            cli_args = (
+                f'--learning_tau {tau} --gamma 0.96 '
+                f'--save_as_file {file_name} '
+                f'--episodes 10 '
+                f'--add_tic_date True '
+                f'--critic_lr_start 0.001 '
+                f'--critic_lr_end  0.0001 '
+                f'--rho 0.005 '
+                f'--mode train '
+                f'--seed {seed} '
+                f'--actor_loss weighted_quantile '
+                f'--actor_lr_start 0.0005 '
+                f'--actor_lr_end 0.0001 '
+
+	
+            )
+
+            print(f"\nRunning: Agent_model_based.py {cli_args}")
+            ipython.run_line_magic('run', f'Agent_model_based.py {cli_args}')
+
+'''
+correct
+--critic_lr_start 0.001 '
+--critic_lr_end 0.0005 '
+--actor_lr_start 0.0005 '
+--actor_lr_end 0.0001 '
+##
+# we used the same var and const(original here)
+def run_qac_batch(taus, seeds, costs):
+    ipython = get_ipython()
+    for tau in taus:
+        for seed in seeds:
+            for cost in costs:
+                file_name = 'final_Q_bull_bear_lowvar_diffcons_cost{}_{}_{}'.format(
+                    str(cost), str(seed), str(tau).replace('.', '')
+                )
+
+                cli_args = (
+                    f'--learning_tau {tau} --gamma 0.96 '
+                    f'--save_as_file {file_name} '
+                    f'--episodes 10 '
+                    f'--transaction_cost {cost} '         
+                    f'--add_tic_date True '
+                    f'--critic_lr_start 0.001 '
+                    f'--critic_lr_end 0.0005 '
+                    f'--rho 0.005 '
+                    f'--mode train '
+                    f'--seed {seed} '
+                    f'--actor_loss weighted_quantile '
+                    f'--actor_lr_start 0.0005 '
+                    f'--actor_lr_end 0.0001 '
+                )
+
+                print(f"\nRunning: Agent_model_based.py {cli_args}")
+                ipython.run_line_magic('run', f'Agent_model_based.py {cli_args}')
+
+# Example call:
+taus = [0.1, 0.5, 0.9]
+seeds = [53,274,1234,89]
+costs = [0.0015, 0.002, 0.0025, 0.003]
+
+run_qac_batch(taus, seeds, costs)
+
+
+
+
+taus = [0.1,0.5,0.9]
+seeds = [53,274,1234,89]
+cost = [0.0015,0.002,0.0025,0.003]
+run_qac_batch(taus,seeds,cost)
+
+    #original
+    const_k = np.array([
+        [ 0.0040,  0.0030],   # Bull
+        [ 0.0030,  0.0028],   # Neutral
+        [-0.0090,  0.0030],   # Bear
+    ], dtype=float)
+    
+
+   
+    '''
+    const_k = np.array([
+        [ 0.0060,  0.0050],  # Bull: lift both assets
+        [ 0.0045,  0.0045],  # Neutral: make both clearly positive
+        [-0.0010,  0.0045],  # Bear: keep asset 2 solidly positive
+    ], dtype=float)
+    '''
+    #original
+    Sigma_k = np.array([
+        [[0.0005,  0.00010],
+        [0.00010, 0.00045]],   # Bull
+        [[0.0018,  0.00000],
+        [0.00000, 0.00140]],   # Neutral
+        [[0.0050, -0.00300],
+        [-0.00300, 0.00200]],  # Bear
+    ], dtype=float)
+
+    '''
+    Sigma_k = np.array([
+    # Bull: modest variance, mild negative corr
+    [[0.00050, -0.00015],
+     [-0.00015, 0.00045]],
+
+    # Neutral: cut variance vs. original, stronger diversification
+    [[0.00100, -0.00025],
+     [-0.00025, 0.00080]],
+
+    # Bear: reduce variance materially; sizeable negative corr but PSD-safe
+    [[0.00250, -0.00090],
+     [-0.00090, 0.00120]],
+    ], dtype=float)
+    '''
+    Q = np.array([
+        [0.97, 0.01, 0.02],
+        [0.15, 0.80, 0.05],
+        [0.10, 0.10, 0.80],
+    ], dtype=float)
+
+    Q_bull_bear = np.array([
+    [0.74, 0.02, 0.24],
+    [0.10, 0.82, 0.08],
+    [0.30, 0.02, 0.68]],dtype=float)  
+
+    Q_neutral_bear = np.array([
+    [0.82, 0.08, 0.10],
+    [0.02, 0.68, 0.30],
+    [0.02, 0.24, 0.74]],dtype=float)   
+
+    Q_bull_neutral = np.array([
+    [0.74, 0.24, 0.02],
+    [0.30, 0.68, 0.02],
+    [0.10, 0.08, 0.82]],dtype=float)    
+
+    K, N = const_k.shape
+
+    # previous risky weight grid
+    Wgrid = np.array([
+        [0.00, 0.00],
+        [1.00, 0.00],
+        [0.00, 1.00],
+        [0.50, 0.50],
+        [0.20, 0.20],
+        [0.35, 0.35],
+        [0.75, 0.25],
+        [0.25, 0.75],
+        [0.60, 0.20],
+        [0.20, 0.60],
+        [0.00, 0.10],
+        [0.10, 0.00],
+        [0.30, 0.00],
+        [0.00, 0.30],
+        [0.60, 0.00],
+        [0.00, 0.60],
+    ], dtype=float)
+
+
+
+
+## different constant ceterib paribus
+
+# %%
+# %%
+def run_qac_batch(taus, seeds):
+    ipython = get_ipython()
+    for tau in taus:
+        for seed in seeds:
+                file_name = 'final_Q_bull_bear_const_diff_{}_{}'.format(
+                    str(seed), str(tau).replace('.', '')
+                )
+
+                cli_args = (
+                    f'--learning_tau {tau} --gamma 0.96 '
+                    f'--save_as_file {file_name} '
+                    f'--episodes 10 '
+                    f'--add_tic_date True '
+                    f'--critic_lr_start 0.001 '
+                    f'--critic_lr_end 0.0005 '
+                    f'--rho 0.005 '
+                    f'--mode train '
+                    f'--seed {seed} '
+                    f'--actor_loss weighted_quantile '
+                    f'--actor_lr_start 0.0005 '
+                    f'--actor_lr_end 0.0001 '
+                )
+
+                print(f"\nRunning: Agent_model_based.py {cli_args}")
+                ipython.run_line_magic('run', f'Agent_model_based.py {cli_args}')
+
+# Example call:
+taus = [0.1, 0.5, 0.9]
+seeds = [53,274,1234,89]
+
+run_qac_batch(taus, seeds)
+
+
+### BUll-Bear original
+
+
+# %%
+# %%
+import numpy as np
+import tensorflow as tf
+
+from model_dirichlet import QACDirichletAgent
+#from model_gauss import QACAgent
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+%matplotlib inline
+
+
+
+import logging
+LOG = logging.getLogger()
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+def run_qac_batch(taus, seeds):
+    ipython = get_ipython()
+    for tau in taus:
+        for seed in seeds:
+                file_name = 'final_Q_bull_bear_original_{}_{}'.format(
+                    str(seed), str(tau).replace('.', '')
+                )
+
+                cli_args = (
+                    f'--learning_tau {tau} --gamma 0.96 '
+                    f'--save_as_file {file_name} '
+                    f'--episodes 10 '
+                    f'--add_tic_date True '
+                    f'--critic_lr_start 0.001 '
+                    f'--critic_lr_end 0.0005 '
+                    f'--rho 0.005 '
+                    f'--mode train '
+                    f'--seed {seed} '
+                    f'--actor_loss weighted_quantile '
+                    f'--actor_lr_start 0.0005 '
+                    f'--actor_lr_end 0.0001 '
+                )
+
+                print(f"\nRunning: Agent_model_based.py {cli_args}")
+                ipython.run_line_magic('run', f'Agent_model_based.py {cli_args}')
+
+# Example call:
+taus = [0.1, 0.5, 0.9]
+seeds = [53,274,1234,89]
+
+run_qac_batch(taus, seeds)
+
+
+                    f'--learning_tau {tau} --gamma 0.96 '
+                    f'--save_as_file {file_name} '
+                    f'--episodes 10 '
+                    f'--add_tic_date True '
+                    f'--critic_lr_start 0.002 '
+                    f'--critic_lr_end 0.001 '
+                    f'--rho 0.02 '
+                    f'--mode train '
+                    f'--seed {seed} '
+                    f'--actor_loss weighted_quantile '
+                    f'--actor_lr_start 0.001 '
+                    f'--actor_lr_end 0.0001 '
+
+
+
+
+
+# %%
+# %%
+# %%
+# %%
+def run_qac_batch(taus, seeds):
+    ipython = get_ipython()
+    for tau in taus:
+        for seed in seeds:
+                file_name = 'final_Q_neutral_bear_original_{}_{}'.format(
+                    str(seed), str(tau).replace('.', '')
+                )
+
+                cli_args = (
+                    f'--learning_tau {tau} --gamma 0.96 '
+                    f'--save_as_file {file_name} '
+                    f'--episodes 10 '
+                    f'--add_tic_date True '
+                    f'--critic_lr_start 0.001 '
+                    f'--critic_lr_end 0.0001 '
+                    f'--rho 0.02 '
+                    f'--mode train '
+                    f'--seed {seed} '
+                    f'--actor_loss weighted_quantile '
+                    f'--actor_lr_start 0.0001 '
+                    f'--actor_lr_end 0.00001 '
+                )
+
+                print(f"\nRunning: Agent_model_based.py {cli_args}")
+                ipython.run_line_magic('run', f'Agent_model_based.py {cli_args}')
+
+# Example call:
+taus = [0.9,0.1, 0.5]
+seeds = [53,274,1234,89]
+
+run_qac_batch(taus, seeds)
+
+TODO: check again this part
+                loss = tf.math.multiply(tf.math.abs(tf.math.subtract(self.tau_levels, is_negative)), abs_error)
+                per_sample = tf.reduce_sum(loss, axis=1, keepdims=True) 
+                critic_loss = (tf.reduce_sum(conditional_prob * per_sample)/conditional_prob_sum)+q_order_loss
+
