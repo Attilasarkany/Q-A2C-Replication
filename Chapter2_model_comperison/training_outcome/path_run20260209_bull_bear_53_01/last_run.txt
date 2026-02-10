@@ -1,0 +1,12 @@
+=== Last Run ===
+timestamp: 2026-02-09T15:16:23.724999
+episodes: 30
+learning_tau: 0.1
+avg_actor_loss: -0.055462
+avg_critic_loss: 0.978287
+avg_reward_path: -0.00062232
+avg_turnover: 0.20935090
+avg_fee: 0.00043964
+evaluate: True
+test_T_days: 5040
+test_seeds: 1,2,3,4
