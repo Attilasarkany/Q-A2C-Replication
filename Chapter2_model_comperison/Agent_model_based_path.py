@@ -63,10 +63,10 @@ parser.add_argument('--critic_lr_end', type=float, default=0.001)
 parser.add_argument('--actor_lr_start', type=float, default=0.001)
 parser.add_argument('--actor_lr_end', type=float, default=0.0001)
 parser.add_argument('--rho', type=float, default=0.1)
-parser.add_argument('--entropy_reg', type=float, default=0.01)  # keep for agent args compat
+parser.add_argument('--entropy_reg', type=float, default=0.01)  # 
 
 parser.add_argument('--transaction_cost', type=float, default=0.0021)
-parser.add_argument('--gamma_crra', type=float, default=5.0)     # your chosen default
+parser.add_argument('--gamma_crra', type=float, default=3.0)     # 
 parser.add_argument('--n_scen', type=int, default=128)           # not used in path sampler but kept for compat
 
 # minibatch
@@ -373,102 +373,140 @@ def main(env_model, agent, monitoring, args):
 
 
 def _build_default_env_agent_monitor(args):
+   
     '''
-
-        Phi_fixed = np.array([[0.15, 0.10],
-                            [0.10, 0.15]], dtype=float)
-        Phi_k = np.tile(Phi_fixed, (3, 1, 1))
-
-        const_k = np.array([
-            [ 0.0040,  0.0030],   # Bull
-            [ 0.0030,  0.0028],   # Neutral
-            [-0.0090,  0.0030],   # Bear
-        ], dtype=float)
-
-        Sigma_k = np.array([
-            [[0.0005,  0.00010],
-            [0.00010, 0.00045]],   # Bull
-            [[0.0018,  0.00000],
-            [0.00000, 0.00140]],   # Neutral
-            [[0.0050, -0.00300],
-            [-0.00300, 0.00200]],  # Bear
-        ], dtype=float)
-
-        # SV/t parameters
-        df_list = np.array([20.0, 10.0, 5.0], dtype=float)
-        logh_mu_list = np.array([-1.6, -1.3, -0.7], dtype=float)
-        sv_rho, sv_sigma = 0.97, 0.20
-
-        Q_bull_bear = np.array([
-            [0.74, 0.02, 0.24],
-            [0.10, 0.82, 0.08],
-            [0.30, 0.02, 0.68],
-        ], dtype=float)
-
-        Q_neutral_bear = np.array([
-            [0.82, 0.08, 0.10],
-            [0.02, 0.68, 0.30],
-            [0.02, 0.24, 0.74],
-        ], dtype=float)
-
-        Q_bull_neutral = np.array([
-            [0.74, 0.24, 0.02],
-            [0.30, 0.68, 0.02],
-            [0.10, 0.08, 0.82],
-        ], dtype=float)
-    '''
-    # Drifts: Bull strongly favors asset1; Bear punishes asset1; asset2 stays slightly + / flat
+    # GOOD solution, focus on time weighted measurements
+    # --- Drifts: daily log-return drift (c_k) ---
     const_k = np.array([
-        [ 0.00075,  0.00025],   # Bull
-        [ 0.00030,  0.00020],   # Neutral
-        [-0.00110,  0.00005],   # Bear
+        [ 0.00100,  0.00022, -0.00008],  # Bull: A1 dominates; A3 costs carry (insurance premium)
+        [ 0.00040,  0.00018,  0.00002],  # Neutral: mild positive for all
+        [-0.00160,  0.00012,  0.00035],  # Bear: A1 crashes; A3 is structurally best; A2 slightly positive/flat
     ], dtype=float)
 
-    Phi_fixed = np.array([[0.15, 0.10],
-                        [0.10, 0.15]], dtype=float)
+    # --- VAR(1) persistence (mild & stable) ---
+    Phi_fixed = np.array([
+        [0.12, 0.04, 0.02],
+        [0.03, 0.10, 0.02],
+        [0.02, 0.03, 0.08],
+    ], dtype=float)
     Phi_k = np.tile(Phi_fixed, (3, 1, 1))
 
-    # Covariances: Bear still riskier, but not "10x", and with negative correlation (asset2 hedges)
+    # --- Base covariances (scaled by SV): Cov(eps_t | k,h) = h_t * Sigma_k ---
+    # Must be positive definite (Cholesky works). These are PD.
     Sigma_k = np.array([
-        # Bull
-        [[0.000196,  0.000050],
-        [0.000050,  0.000064]],
+        # Bull: moderate vol, mild +corr A1-A2, A3 slightly diversifying
+        [[0.000200,  0.000050, -0.000015],
+        [0.000050,  0.000080,  0.000010],
+        [-0.000015, 0.000010,  0.000100]],
 
-        # Neutral
-        [[0.000225,  0.000030],
-        [0.000030,  0.000081]],
+        # Neutral: a bit higher vol/corr
+        [[0.000300,  0.000060, -0.000020],
+        [0.000060,  0.000100,  0.000010],
+        [-0.000020, 0.000010,  0.000120]],
 
-        # Bear  (risk up + hedge effect)
-        [[0.000625, -0.000140],
-        [-0.000140, 0.000196]],
+        # Bear: A1 vol explodes; A3 strongly negative corr with A1 (true hedge)
+        [[0.001200, -0.000120, -0.000350],
+        [-0.000120, 0.000180,  0.000020],
+        [-0.000350, 0.000020,  0.000350]],
     ], dtype=float)
 
-    # SV/t: tails do the heavy lifting in Bear (so volatility timing alone isn't enough)
-    df_list = np.array([40.0, 12.0, 4.0], dtype=float)
-    logh_mu_list = np.array([-2.1, -1.5, -0.7], dtype=float)
-    sv_rho, sv_sigma = 0.97, 0.23
+    # --- Tail + SV settings ---
+    # Keep Bull fairly Gaussian, Neutral medium tails, Bear heavy tails
+    df_list = np.array([30.0, 12.0, 3.0], dtype=float)
+
+    # SV level by regime (log h mean): higher in Bear => higher vol scale
+    # h = exp(logh); so Bear has much larger scaling
+    logh_mu_list = np.array([-2.6, -2.0, -0.7], dtype=float)
+
+    # persistent vol clustering => "volatility timing" is learnable
+    sv_rho, sv_sigma = 0.985, 0.22
+
+    # --- Monthly regime Markov matrices (3 scenarios for BB/BN/NB plots) ---
+    # Key for interpretability: regimes are persistent (not choppy).
     Q_bull_bear = np.array([
-        [0.74, 0.02, 0.24],
-        [0.10, 0.82, 0.08],
-        [0.30, 0.02, 0.68],
-    ], dtype=float)
-
-    Q_neutral_bear = np.array([
-        [0.82, 0.08, 0.10],
-        [0.02, 0.68, 0.30],
-        [0.02, 0.24, 0.74],
+        [0.92, 0.03, 0.05],
+        [0.15, 0.70, 0.15],
+        [0.06, 0.04, 0.90],
     ], dtype=float)
 
     Q_bull_neutral = np.array([
-        [0.74, 0.24, 0.02],
-        [0.30, 0.68, 0.02],
-        [0.10, 0.08, 0.82],
+        [0.93, 0.06, 0.01],
+        [0.10, 0.88, 0.02],
+        [0.18, 0.20, 0.62],
     ], dtype=float)
+
+    Q_neutral_bear = np.array([
+        [0.75, 0.20, 0.05],
+        [0.05, 0.85, 0.10],
+        [0.03, 0.07, 0.90],
+    ], dtype=float)
+
+    '''
+    # daily log-return drifts
+    const_k = np.array([
+        [ 0.00105,  0.00028, -0.00018],  # Bull: A1 strong carry; A3 costs (insurance premium)
+        [ 0.00045,  0.00022, -0.00008],  # Neutral: mild carry; A3 still costs a bit
+        [-0.00180,  0.00008,  0.00055],  # Bear: A1 crashy; A3 pays; A2 small positive
+    ], dtype=float)
+
+    Phi_fixed = np.array([
+        [0.12, 0.04, 0.02],   # A1 depends mostly on own lag
+        [0.03, 0.10, 0.02],   # A2 mild own persistence
+        [0.02, 0.03, 0.08],   # A3 lowest persistence (insurance-like)
+    ], dtype=float)
+
+    # Use the same Phi in all regimes to isolate the effect of:
+    # (i) drift differences c_k, (ii) covariance differences Sigma_k, (iii) SV/t differences (logh_mu, df, sv_rho/sigma)
+    Phi_k = np.tile(Phi_fixed, (3, 1, 1))
+
+    Sigma_k = np.array([
+    # Bull: moderate risk, mild diversification from A3
+    [[0.000220, 0.000080, -0.000030],
+     [0.000080, 0.000100, -0.000010],
+     [-0.000030,-0.000010, 0.000140]],
+
+    # Neutral: a bit more risk/correlation
+    [[0.000320, 0.000110, -0.000035],
+     [0.000110, 0.000130, -0.000015],
+     [-0.000035,-0.000015, 0.000170]],
+
+    # Bear: A1 risk explodes; A3 is a *true* hedge (strong negative cov with A1)
+    [[0.001500,-0.000150, -0.000650],
+     [-0.000150,0.000220,  0.000020],
+     [-0.000650,0.000020,  0.000500]],
+    ], dtype=float)
+
+    df_list = np.array([18.0, 14.0, 8.0], dtype=float)         # tails exist everywhere, worse in Bear
+    logh_mu_list = np.array([-2.5, -2.2, -1.4], dtype=float)   # Bear higher vol level
+    sv_rho, sv_sigma = 0.995, 0.18                              # persistent--> forecastable
+
+
+    Q_bull_bear = np.array([
+    [0.92, 0.04, 0.04],   # Bull mostly stays Bull, sometimes Neutral/Bear
+    [0.15, 0.70, 0.15],   # Neutral can go either way
+    [0.05, 0.05, 0.90],   # Bear persistent, occasional exit
+]   , dtype=float)
+
+    # (BN) Bull-Neutral scenario: Bear is rare, Bull/Neutral are persistent
+    Q_bull_neutral = np.array([
+        [0.94, 0.05, 0.01],   # Bull -> mostly Bull, some Neutral, very rare Bear
+        [0.08, 0.90, 0.02],   # Neutral persistent, small chance Bull/Bear
+        [0.20, 0.20, 0.60],   # if Bear happens, it can exit (not too sticky here)
+    ], dtype=float)
+
+    # (NB) Neutral-Bear scenario: more time in Neutral/Bear, Bull less dominant
+    Q_neutral_bear = np.array([
+        [0.75, 0.20, 0.05],   # Bull less persistent, drifts into Neutral/Bear
+        [0.05, 0.85, 0.10],   # Neutral persistent, sometimes Bear
+        [0.03, 0.07, 0.90],   # Bear persistent
+    ], dtype=float)
+
     q_map = {
         "bull_bear": Q_bull_bear,
         "neutral_bear": Q_neutral_bear,
         "bull_neutral": Q_bull_neutral,
     }
+
     Q = q_map.get(getattr(args, "q_matrix", "bull_bear"), Q_bull_bear)
 
     K, N = const_k.shape
@@ -492,7 +530,9 @@ def _build_default_env_agent_monitor(args):
         k0=0,
     )
 
-    state_shape = (2 * N + K + 1,)
+    # State: [w_prev(N), r_now(N), onehot(K)] = 2*N + K dimensions (h_now removed)
+    # For N=3, K=3: 2*3 + 3 = 9 dimensions
+    state_shape = (2 * N + K,)
 
     agent = QACDirichletAgent(state_shape=state_shape, stock_dimension=N, args=args)
     monitoring = Monitoring(agent=agent, env=env, args=args)

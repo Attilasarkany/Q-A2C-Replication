@@ -109,10 +109,8 @@ class Monitoring:
             k_now = int(k_days[t - 1])
             r_next = r_days[t]           # next log returns (realization)
             k_next = int(k_days[t])
-            h_now = float(h_days[t - 1])
-            h_next = float(h_days[t])
 
-            s_obs = build_state_obs(w_prev, r_now, h_now, k_now, K) #
+            s_obs = build_state_obs(w_prev, r_now, k_now, K) #
             s_tf = tf.convert_to_tensor(s_obs[None, :], dtype=tf.float32)
             critic_out = agent.critic_network(s_tf, training=False).numpy().squeeze()
 

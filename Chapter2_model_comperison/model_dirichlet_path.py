@@ -335,7 +335,7 @@ class QACDirichletAgent:
             # r: reward (stochastic) conditional on the eps and k'
             vn = self.critic_target(sn)
             y = r + self.gamma * vn
-            increased_order_loss_weight = 5.0
+            increased_order_loss_weight = 1.0 # 5.0, originally across all of the models we used 5. 
             with tf.GradientTape() as critic_tape:
                 v = self.critic_network(s)
                 error = y - v
