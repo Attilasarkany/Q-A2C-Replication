@@ -8,10 +8,16 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 from functools import reduce
+import os
 
 
 '''
 Create a custom environment with functions
+NOTE: we did this extension in the beginning for  + 1 year extra of testing! 
+i.e use_extended = True, then we will add the extended data to the test set after the split.
+we did not care this case the training part
+we calcualted the values in general continiously not train/ val/ test separately.
+We ll save data !
 '''
 
 import pandas as pd
@@ -92,7 +98,8 @@ class LoaderEnginering:
 
     def _add_features_technical(self):
     # Always concatenate and calculate continuously for consistency
-        if self.args.use_extended:
+        use_extended = getattr(self.args, "use_extended", False)
+        if use_extended:
             data_combined = pd.concat([self.data, self.data_exp_extend], ignore_index=True)
         else:
             data_combined = self.data.copy()
@@ -107,15 +114,16 @@ class LoaderEnginering:
         # Create filtered versions based on date ranges
         original_dates = self.data['date'].unique()
         
-        # For non-extended mode: only use original dates
+        # For non-extended mode: only use original dates, just for safety
         self.tic_date = roc_combined[roc_combined['date'].isin(original_dates)]
         
         # For extended mode: use all dates (assigned in data_split if extended_data is not None)
-        self.tic_date_extend = roc_combined if self.args.use_extended else self.tic_date
+        # this was for testing only!
+        self.tic_date_extend = roc_combined if use_extended else self.tic_date
         
         # Return original references for backward compatibility
         data = self.data.reset_index(drop=True)
-        data_extend = self.data_exp_extend.reset_index(drop=True) if self.args.use_extended else None
+        data_extend = self.data_exp_extend.reset_index(drop=True) if use_extended else None
         
         return data, data_extend   
 
@@ -231,7 +239,7 @@ class LoaderEnginering:
             max_date = pd.to_datetime(df_sorted['date'].max())
 
             # Expanding window: train starts at the beginning and grows by chunk_step_years
-            # No validation window in chunk mode; test follows train directly
+            # No validation window in chunk mode, test follows train directly
             train_end = start_date + pd.DateOffset(years=self.args.train_years + self.args.chunk_idx * self.args.chunk_step_years)
             test_end = train_end + pd.DateOffset(years=self.args.test_years)
 
@@ -276,9 +284,13 @@ class LoaderEnginering:
         
         # Save CSV output
         if self.args.chunk_training:
-            train_filename = "train_data_chunk.csv"
+            chunk_idx = getattr(self.args, "chunk_idx", 0)
+            train_filename = f"train_data_chunk{chunk_idx:02d}.csv"
+            test_filename = f"test_data_chunk{chunk_idx:02d}.csv"
             train_data.to_csv(train_filename, index=False)
+            test_data.to_csv(test_filename, index=False)
             print(f"Saved train data to {train_filename}")
+            print(f"Saved test data to {test_filename}")
         else:
             extension_label = 'extended' if is_extended else 'not_extended'
             test_filename = f'test_data_{extension_label}.csv'
@@ -310,7 +322,8 @@ class LoaderEnginering:
         
         # Apply cov to original (and extended if enabled) (this consumes first 64 days)
         data_with_features = self._get_cov_df(lookback=64, df=data_with_features)
-        if self.args.use_extended and data_extend_with_features is not None:
+        use_extended = getattr(self.args, "use_extended", False)
+        if use_extended and data_extend_with_features is not None:
             data_extend_with_features = self._get_cov_df(lookback=64, df=data_extend_with_features)
         
         after_cov_start = data_with_features['date'].min()
@@ -322,7 +335,7 @@ class LoaderEnginering:
 
         # Apply rolling scaling ONCE on full continuous data (avoid repeated loss per split)
         data_with_features = self._rolling_window_scaling(data_with_features, self.final_feature_list)
-        if self.args.use_extended and data_extend_with_features is not None:
+        if use_extended and data_extend_with_features is not None:
             data_extend_with_features = self._rolling_window_scaling(data_extend_with_features, self.final_feature_list)
 
         self.final_feature_list_scaled = [col for col in data_with_features.columns if '_scaled' in col]
@@ -333,7 +346,7 @@ class LoaderEnginering:
             0.7,
             0.15,
             self.final_feature_list,
-            extended_data=data_extend_with_features if self.args.use_extended else None
+            extended_data=data_extend_with_features if use_extended else None
         )
 
         self.train_df = train 
@@ -505,7 +518,6 @@ class Portfolio_engine:
             if df_daily_return['daily_return'].std() !=0:
               sharpe = (252**0.5)*df_daily_return['daily_return'].mean()/ \
                        df_daily_return['daily_return'].std()
-              print("Sharpe: ",sharpe)
             print("=================================")
             
             return self.state, self.reward, self.terminal,self.transaction_cost
@@ -547,7 +559,6 @@ class Portfolio_engine:
             df_daily_return = pd.DataFrame(self.portfolio_return_memory, columns=['daily_return'])
             if df_daily_return['daily_return'].std() != 0:
                 sharpe = (252**0.5) * df_daily_return['daily_return'].mean() / df_daily_return['daily_return'].std()
-                print("Sharpe: ", sharpe)
             print("=================================")
             return self.state, self.reward, self.terminal, self.transaction_cost
         else:

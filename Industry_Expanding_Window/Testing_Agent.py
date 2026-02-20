@@ -71,6 +71,10 @@ parser.add_argument('--mode', type=str, nargs='?', default='test')
 parser.add_argument('--add_tic_date', type=str2bool, nargs='?', default=False)
 parser.add_argument('--reward_scaling', type=float, nargs='?', default=1221) # 1221
 parser.add_argument('--use_extended', type=str2bool, nargs='?', default=False) # !!!
+parser.add_argument('--chunk_training', type=str2bool, nargs='?', default=False)
+parser.add_argument('--train_years', type=int, nargs='?', default=10)
+parser.add_argument('--test_years', type=int, nargs='?', default=1)
+parser.add_argument('--chunk_step_years', type=int, nargs='?', default=1)
 
 # Validation 
 parser.add_argument('--min_epochs', type=int, default=4, 
@@ -183,7 +187,6 @@ def main(env,agent,monitoring,args):
                 #print("ac:",actor_loss)                                                                        
 
 
-
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
 
@@ -245,6 +248,40 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 # %%
+taus = [0.1, 0.5, 0.9]
+seeds = [53, 274]
+parallel_args = (
+    "--parallel_batch True "
+    "--parallel_taus 0.1,0.5,0.9 "
+    "--parallel_seeds 53,274 "
+    "--parallel_max_workers 4 "
+    "--gamma 0.99 "
+    "--save_as_file 20260502_extended "
+    "--episodes 35 "
+    "--add_tic_date True "
+    "--chunk_training True "
+    "--use_extended False "
+    "--train_years 10 "
+    "--test_years 1 "
+    "--chunk_step_years 1 "
+    "--min_epochs 20 "
+    "--patience 3 "
+    "--mc True "
+    "--critic_type standard "
+    "--rho 0.1 "
+    "--sigma_start 1.5 "
+    "--mode train "
+    "--actor_loss weighted_quantile "
+    "--entropy_reg 1 "
+)
+
+ipython = get_ipython()
+print(f"\nRunning: Agent.py {parallel_args}")
+ipython.run_line_magic('run', f'Agent.py {parallel_args}')
+
+# %%
+# %%
+# %%
 def run_qac_batch(taus, seeds):
     ipython = get_ipython()
     for tau in taus:
@@ -259,6 +296,11 @@ def run_qac_batch(taus, seeds):
                 f'--save_as_file {file_name} '
                 f'--episodes 35 '
                 f'--add_tic_date True '
+                f'--chunk_training True '
+                f'--use_extended False '
+                f'--train_years 10 '
+                f'--test_years 1 '
+                f'--chunk_step_years 1 '
                 f'--min_epochs 20 '
                 f'--patience 3 '
                 f'--mc True '
@@ -266,7 +308,6 @@ def run_qac_batch(taus, seeds):
                 f'--rho 0.1 '
                 f'--sigma_start 1.5 '
                 f'--mode train '
-                f'--transaction_cost 0.001 '
                 f'--seed {seed} '
                 f'--actor_loss weighted_quantile '
                 f'--entropy_reg 1 '
@@ -278,7 +319,7 @@ def run_qac_batch(taus, seeds):
 
 
 taus = [0.1,0.5,0.9]
-seeds = [53,274,1234,89]
+seeds = [53,274]
 run_qac_batch(taus,seeds)
 
     '''
