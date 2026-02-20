@@ -451,8 +451,8 @@ def _build_default_env_agent_monitor(args):
 
     Phi_fixed = np.array([
         [0.12, 0.04, 0.02],   # A1 depends mostly on own lag
-        [0.03, 0.10, 0.02],   # A2 mild own persistence
-        [0.02, 0.03, 0.08],   # A3 lowest persistence (insurance-like)
+        [0.03, 0.10, 0.02],   # A2 smaller own persistence than A!
+        [0.02, 0.03, 0.08],   # A3 lowest persistence (insurance-like), rare events
     ], dtype=float)
 
     # Use the same Phi in all regimes to isolate the effect of:
@@ -461,6 +461,7 @@ def _build_default_env_agent_monitor(args):
 
     Sigma_k = np.array([
     # Bull: moderate risk, mild diversification from A3
+    # regime covariance should be positive definite
     [[0.000220, 0.000080, -0.000030],
      [0.000080, 0.000100, -0.000010],
      [-0.000030,-0.000010, 0.000140]],

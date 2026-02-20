@@ -171,14 +171,18 @@ def simulate_rs_var1_monthly_regimes_RS_SV_T(
     return r_days, k_days, k_month, sample_dates, sample_months, h_days
 
 
-def build_state_obs(w_prev, r_now, h_now, k, K):
+def build_state_obs(w_prev, r_now, k, K):
     """
-    State: [w_prev(N), r_now(N), h_t(1), onehot(K)]
+    State: [w_prev(N), r_now(N), onehot(K)]
+    
+    Note: h_t (stochastic volatility) is NOT included because:
+      - It's unobservable in practice (latent factor)
+      - Regime k already captures vol regime (Bull/Neutral/Bear have different base vols)
+      - Recent returns r_now contain information about realized volatility
     """
     onehot = np.zeros(int(K), float)
     onehot[int(k)] = 1.0
-    h_now = np.asarray([h_now], float)
-    return np.concatenate([np.asarray(w_prev, float), np.asarray(r_now, float), h_now, onehot], axis=0)
+    return np.concatenate([np.asarray(w_prev, float), np.asarray(r_now, float), onehot], axis=0)
 
 
 class RSVARPathSampler:
@@ -297,10 +301,9 @@ class RSVARPathSampler:
             r_now = r_days[t - 1] # simulated returns 
             k_now = int(k_days[t - 1]) # simulated regime at time t-1
             k_next = int(k_days[t]) # simulated regime at time t
-            h_now = float(h_days[t - 1])
-            h_next = float(h_days[t])
+            # h_now removed from state - unobservable latent factor
 
-            s_obs = build_state_obs(w_prev, r_now, h_now, k_now, self.K) # we need self.K to build onehot
+            s_obs = build_state_obs(w_prev, r_now, k_now, self.K) # state: [w_prev, r_now, onehot(k)]
             s_tf = tf.convert_to_tensor(s_obs[None, :], dtype=tf.float32)
 
             a_full = actor.sample_action(s_tf).numpy()[0]
@@ -314,7 +317,7 @@ class RSVARPathSampler:
                 r_now=r_now,
             )
 
-            s_next = build_state_obs(a_full, r_days[t], h_next, k_next, self.K)
+            s_next = build_state_obs(a_full, r_days[t], k_next, self.K)
             transitions.append((s_obs, s_next, a_full, rwd))
 
             w_prev = a_full.copy()
