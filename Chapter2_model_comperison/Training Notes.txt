@@ -2,6 +2,11 @@ Example invoke
 
 
 Lst run model based
+# dont forget i changed the quantile penalty to 1 form 5 !!
+# %%
+# %%
+# %%
+# %%
 # %%
 
 def run_qac_path_parallel_notebook(
@@ -19,24 +24,24 @@ def run_qac_path_parallel_notebook(
     test_start_date="2000-01-03",
 
     # training
-    episodes=30,
-    batch_size=128,
-    gamma=0.99,
+    episodes=40,
+    batch_size=64,
+    gamma=0.96,
     rho=0.01,
-    critic_lr_start=0.005,
-    critic_lr_end=0.001,
+    critic_lr_start=0.01,
+    critic_lr_end=0.002,
     actor_lr_start=0.001,
     actor_lr_end=0.0001,
     actor_loss="weighted_quantile",
     critic_type="standard",
     entropy_reg=0.01,
-    transaction_cost=0.0021,
-    gamma_crra=5.0,
+    transaction_cost=0.0001,
+    gamma_crra=3.0,
 
     # output
-    save_as_file="path_run20260209",
+    save_as_file="path_run20260213_c001_new",
     checkpoints_dir="./training_outcome",
-    parallel_max_workers=3,
+    parallel_max_workers=10,
     evaluate=True,
     test_tag="test",
 
@@ -90,6 +95,11 @@ def run_qac_path_parallel_notebook(
     print("\nRUNNING:\n", "Agent_model_based_path.py", cli, "\n")
 
     ipy.run_line_magic("run", f"Agent_model_based_path.py {cli}")
+
+
+# Example:
+run_qac_path_parallel_notebook()
+
 
 
 # Example:
