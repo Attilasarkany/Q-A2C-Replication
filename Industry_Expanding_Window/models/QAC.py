@@ -184,7 +184,7 @@ def prior(kernel_size, bias_size=0, dtype=None):
     trainable_mu = tf.Variable(tf.zeros(n), trainable=True, dtype=dtype, name="trainable_mu")
     
     
-    fixed_sigma = tf.ones(n) * 3.0 # Optimal?
+    fixed_sigma = tf.ones(n) * 1.0 # Optimal?3 original
 
     return tf.keras.Sequential([
         tfp.layers.DistributionLambda(
@@ -286,7 +286,7 @@ class QACAgent:
             args.critic_lr_start,
             args.episodes,
             end_learning_rate=args.critic_lr_end,
-            power=1.5,  # it can cause NaNs, be careful with learning rates.
+            power=1.0,  # 1.5 it can cause NaNs, be careful with learning rates.
         )
         self.critic_optimizer = tf.keras.optimizers.Adam(critic_decay)
 
@@ -294,7 +294,7 @@ class QACAgent:
             args.actor_lr_start,
             args.episodes,
             end_learning_rate=args.actor_lr_end,
-            power=1.5,
+            power=1.0,  # 1.5 it can cause NaNs, be careful with learning rates.
         )
         self.actor_optimizer = tf.keras.optimizers.Adam(actor_decay)
 
@@ -343,7 +343,7 @@ class QACAgent:
         '''
         vn = self.critic_target(sn)
         y = r + self.gamma * vn
-        increased_order_loss_weight = 5.0  # 5.0
+        increased_order_loss_weight = 1.0  # 5.0
         with tf.GradientTape() as critic_tape:
             v = self.critic_network(s)  # if monte carlo dropout then set traing = True
             error = y - v
@@ -390,7 +390,7 @@ class QACAgent:
             if self.args.actor_loss=='is_negative':   
                 actor_loss = tf.reduce_sum(log_prob * scale * is_negative, axis=1)#- self.args.entropy_reg * entropy
             elif self.args.actor_loss=='weighted_quantile':
-                actor_loss = -tf.reduce_sum(log_prob * error * t_weight*10, axis=1) #- self.args.entropy_reg * entropy
+                actor_loss = -tf.reduce_sum(log_prob * error * t_weight*2, axis=1)# 10- self.args.entropy_reg * entropy # lets add
             elif self.args.actor_loss=='advantage':
                 actor_loss = -tf.reduce_sum(log_prob * error, axis=1) #- self.args.entropy_reg * entropy
 
