@@ -351,6 +351,7 @@ def Markowitz_with_turnover_TC_diffobj_daily(
     use_drift_turnover=True,
     bounded_b: bool = False,          
     use_avg_vol_proxy: bool = True,   
+    use_assetwise_vol_proxy: bool = False,  # per-asset vol scaling, similar to Demiguel
     vol_window: int = 20,            
     maxiter: int = 100000,):
     '''
@@ -369,19 +370,34 @@ def Markowitz_with_turnover_TC_diffobj_daily(
         proxy = daily_factors.loc[idx, market_vol_proxy].astype(float)
         s = proxy.rolling(int(vol_window)).std(ddof=1)
     else:
-        if use_avg_vol_proxy:
-            # average of per-asset rolling vols
-            s = X.rolling(int(vol_window)).std(ddof=1).mean(axis=1)
+        if use_assetwise_vol_proxy:
+            # per-asset rolling std, s is DataFrame (T,N)!!
+            s = X.rolling(int(vol_window)).std(ddof=1)
         else:
-            # equal-weighted index vol
-            proxy = X.mean(axis=1)
-            s = proxy.rolling(int(vol_window)).std(ddof=1)
+            if use_avg_vol_proxy:
+                # average of per-asset rolling vols
+                s = X.rolling(int(vol_window)).std(ddof=1).mean(axis=1)
+            else:
+                # equal-weighted index vol
+                proxy = X.mean(axis=1)
+                s = proxy.rolling(int(vol_window)).std(ddof=1)
 
     s = s.shift(1)  # day ahead: should be low signal
-    valid = s.notna()
+    valid = s.notna() # bollean
+
+    # If s is DataFrame, valid is DataFrame -> reduce to row mask
+    if isinstance(valid, pd.DataFrame):
+        valid = valid.all(axis=1)
 
     Xv = X.loc[valid]
-    sv = s.loc[valid].to_numpy().reshape(-1, 1)
+    
+    # Build sv with correct shape
+    if use_assetwise_vol_proxy and isinstance(s, pd.DataFrame):
+        # sv: (T,N)
+        sv = s.loc[valid, Xv.columns].to_numpy()
+    else:
+        # sv: (T,1)
+        sv = s.loc[valid].to_numpy().reshape(-1, 1) # no columns to specify
     sv = np.maximum(sv, 1e-12)
 
     R = Xv.to_numpy()  # (T,N)
@@ -469,6 +485,12 @@ def Markowitz_with_turnover_TC_diffobj_daily(
     costs = c_tc * taus                               
     port_ret_net = port_ret_gross - pd.Series(costs, index=Xv.index)
 
+    # Store vol_signal with correct format
+    if use_assetwise_vol_proxy and isinstance(s, pd.DataFrame):
+        vol_signal = s.loc[valid, Xv.columns].copy()
+    else:
+        vol_signal = pd.Series(s.loc[valid].values, index=Xv.index, name="s_lag")
+    
     return {
         "a": pd.Series(eta[:N], index=Xv.columns, name="a"),
         "b": pd.Series(eta[N:], index=Xv.columns, name="b"),
@@ -477,7 +499,7 @@ def Markowitz_with_turnover_TC_diffobj_daily(
         "portfolio_returns_net": port_ret_net,
         "turnover": pd.Series(taus, index=Xv.index, name="turnover"),
         "costs": pd.Series(costs, index=Xv.index, name="costs"),
-        "vol_signal": pd.Series(s.loc[valid].values, index=Xv.index, name="s_lag"),
+        "vol_signal": vol_signal,
         "opt_result": res,
         "use_drift_turnover": use_drift_turnover,
         "bounded_b": bounded_b,
